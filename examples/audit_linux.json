@@ -1,0 +1,99 @@
+{
+  "customer_name": "Sir Testalot",
+  "initial_date": "2021-06-23",
+  "last_changed": "2021-06-23",
+  "version": "0.1.0",
+  "conf_os": "linux",
+  "root_required": true,
+  "additional_files": [
+    "/etc/crontab",
+    "/proc/version",
+    "/etc/passwd"
+  ],
+  "audit_list": [
+    {
+      "name": "ssh settings",
+      "tasks": [
+        {
+          "type": "command",
+          "execute": "ps aux | grep 'sshd' | grep -v 'grep'",
+          "expected": [
+            ""
+          ],
+          "operator": "not equals",
+          "on_success": {
+            "type": "command",
+            "execute": "egrep '^PermitRootLogin|^#PermitRootLogin' /etc/ssh/sshd_config | cut -d' ' -f 2",
+            "expected": [
+              "yes"
+            ],
+            "operator": "not equals"
+          }
+        }
+      ]
+    },
+    {
+      "name": "check for group file consistency",
+      "tasks": [
+        {
+          "type": "command",
+          "execute": "sh -c grpck -q -r",
+          "expected": [
+            ""
+          ],
+          "operator": "equals"
+        }
+      ]
+    },
+    {
+      "name": "check sudo configuration",
+      "tasks": [
+        {
+          "type": "command",
+          "execute": "ls -l /etc/sudoers | cut -d' ' -f 3",
+          "expected": [
+            "root"
+          ],
+          "operator": "equals"
+        },
+        {
+          "type": "command",
+          "execute": "ls -l /etc/sudoers | cut -c 2-10",
+          "expected": [
+            "rw-------",
+            "rw-rw----",
+            "rw-r-----",
+            "r--r-----"
+          ],
+          "operator": "equals"
+        }
+      ]
+    },
+    {
+      "name": "check for files without owner or group",
+      "tasks": [
+        {
+          "type": "command",
+          "execute": "sh -c find / -nouser -o -nogroup 2>/dev/null | egrep -v '^find:' | xargs ls -ld",
+          "expected": [
+            ""
+          ],
+          "operator": "equals"
+        }
+      ]
+    },
+    {
+      "name": "pam.d dir info gathering",
+      "tasks": [
+        {
+          "type": "script",
+          "execute": "let result;\nlet cmd1 = auditheia.osExec(\"ls /etc/pam.d\");\nlet files = cmd1[1].split('\\n');\nfor (let i = 0; i < files.length; i++) {\n    let cmdFor = auditheia.osExec(\"ls -l /etc/pam.d/\" + files[i]);\n}\nresult = \"returned normal\"",
+          "expected": [
+            "returned normal"
+          ],
+          "operator": "equals"
+        }
+      ]
+    }
+  ]
+}

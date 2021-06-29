@@ -1,0 +1,152 @@
+{
+    "customer_name": "Sir Testalot",
+    "initial_date": "2021-06-01",
+    "last_changed": "2021-06-01",
+    "version": "0.0.1",
+    "conf_os": "windows",
+    "root_required": true,
+    "additional_files": [
+    ],
+    "audit_list": [
+      {
+        "name": "simple command demo SUCCESS",
+        "tasks": [
+          {
+            "type": "command",
+            "execute": "cmd /c echo test0",
+            "expected": [
+              "test0"
+            ],
+            "operator": "equals"
+          },
+          {
+            "type": "command",
+            "execute": "powershell /C echo test2",
+            "expected": [
+              "test2"
+            ],
+            "operator": "not equals",
+            "on_fail": {
+              "type": "command",
+              "execute": "powershell echo test2",
+              "expected": [
+                "test2"
+              ],
+              "operator": "equals"
+            }
+          },
+          {
+            "type": "command",
+            "execute": "powershell /c echo 'running test3'",
+            "expected": [
+              "test3"
+            ],
+            "operator": "contains"
+          }
+        ]
+      },
+      {
+        "name": "simple command demo FAIL/ERROR",
+        "tasks": [
+            {
+              "type": "command",
+              "execute": "cmd /c echo test0",
+              "expected": [
+                "test1"
+              ],
+              "operator": "equals"
+            },
+            {
+              "type": "command",
+              "execute": "powershell /C eho test2",
+              "expected": [
+                "test2"
+              ],
+              "operator": "notanoperator"
+            },
+            {
+              "type": "notatype",
+              "execute": "powershell /c echo test3",
+              "expected": [
+                "test3"
+              ],
+              "operator": "equals"
+            }
+          ]
+      },
+      {
+        "name": "advanced command demo SUCCESS",
+        "tasks": [
+          {
+            "type": "command",
+            "execute": "cmd echo 10 > testFile.txt",
+            "expected": [
+              ""
+            ],
+            "operator": "contains",
+            "on_success":{
+                "type": "command",
+                "execute": "cmd type testFile.txt | findstr 10",
+                "expected": [
+                  "test"
+                ],
+                "operator": "contains",
+                "on_success":{
+                  "type": "command",
+                  "execute": "findstr 10 testFile.txt",
+                  "expected": [
+                    "test"
+                  ],
+                  "operator": "not equals",
+                  "on_failure": {
+                    "type": "command",
+                  "execute": "findstr 10 testFile.txt",
+                  "expected": [
+                    "10"
+                  ],
+                  "operator": "equals"
+                  }
+              }
+            }
+          },
+          {
+            "type": "command",
+            "execute": "findstr 10 testFile.txt",
+            "expected": [
+              "5"
+            ],
+            "operator": "greater",
+              "on_success": {
+                "type": "command",
+                "execute": "findstr 10 testFile.txt",
+                "expected": [
+                  "15"
+                ],
+                "operator": "lesser"
+              }
+          }
+        ]
+      },
+      {
+        "name": "script demo",
+        "tasks": [
+          {
+            "type": "script",
+            "execute": "let result; result='hello';",
+            "expected": [
+              "hello"
+            ],
+            "operator": "equals"
+          },
+          {
+            "type": "script",
+            "execute": "let result; let commandResult = auditheia.osExec('cmd echo hello'); result=commandResult[1]; auditheia.log(2, 'result: ' + result); console.log('result: ' + result);",
+            "expected": [
+              "hello"
+            ],
+            "operator": "equals"
+          }
+        ]
+      }
+    ]
+  }

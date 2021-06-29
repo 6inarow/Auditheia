@@ -1,0 +1,37 @@
+{
+    "customer_name": "Darwin McTest",
+    "initial_date": "2021-05-06",
+    "last_changed": "2021-05-06",
+    "version": "0.0.1",
+    "conf_os": "darwin",
+    "root_required": true,
+    "additional_files": [],
+    "audit_list": [
+      {
+        "name": "disable printer sharing",
+        "tasks": [
+          {
+            "type": "command",
+            "execute": "cupsctl | grep _share_printers | cut -d'=' -f2",
+            "expected": [
+              "0\n"
+            ],
+            "operator": "equals"
+          }
+        ]
+      },
+      {
+        "name": "turn off bluetooth if no paired devices exist",
+        "tasks": [
+          {
+            "type": "command",
+            "execute": "defaults read /Library/Preferences/com.apple.Bluetooth ControllerPowerState",
+            "expected": [
+              "0\n"
+            ],
+            "operator": "equals"
+          }
+        ]
+      }
+    ]
+  }

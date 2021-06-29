@@ -1,0 +1,27 @@
+{
+  "customer_name": "Mr. Anderson",
+  "initial_date": "2021-05-06",
+  "last_changed": "2021-05-06",
+  "version": "0.0.1",
+  "conf_os": "linux",
+  "root_required": true,
+  "additional_files": [
+    "/etc/shadow",
+    "/etc/passwd"
+  ],
+  "audit_list": [
+    {
+      "name": "search for files with sticky bit set",
+      "tasks": [
+        {
+          "type": "command",
+          "execute": "/bin/bash -c find / -perm -1000 2>/dev/null | xargs ls -ld",
+          "expected": [
+            ""
+          ],
+          "operator": "equals"
+        }
+      ]
+    }
+  ]
+}

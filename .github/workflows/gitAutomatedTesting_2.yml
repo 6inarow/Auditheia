@@ -1,0 +1,367 @@
+name: Auditheia
+
+on:
+  push:
+    branches:    
+      - 'main'
+
+  pull_request:
+    branches:    
+      - 'main'
+    
+jobs:
+  build_linux_latest:
+    name: build_Linux_20.04.2_LTS
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        go: [ '1.16.x' ]
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Setup code  
+        uses: actions/checkout@v2
+        with:
+          ref: main
+      - name: OS_Build
+        run: uname -a  
+      - name: Build Release
+        run: lsb_release -a   
+      - name: Change Constant LATEST_VERSION
+        run:  cd /home/runner/work/Auditheia/Auditheia/src/memory/constants && echo -e "package constants\nconst (\nLOCAL_1 bool = false\nLOCAL_2 bool = false\nRUNNER bool = true\nLATEST_VERSION bool = true\n)" > constantsForTesting.go
+      - name: Build Auditheia
+        run: cd /home/runner/work/Auditheia/Auditheia/src && go build
+      - name: Create audit.json
+        run: cd /home/runner/work/Auditheia/Auditheia/src && echo '{"customer_name":"Mr. Anderson","initial_date":"2021-05-06","last_changed":"2021-05-06","version":"0.0.1","conf_os":"linux","root_required":true,"additional_files":["/etc/shadow","/etc/passwd"],"audit_list":[{"name":"cramfs filesystem check","tasks":[{"type":"command","executable":"modprobe -n -v cramfs","expected":["install /bin/true" ],"operator":"equals","on_success":{"type":"command","executable":"lsmod | grep cramfs", "expected":[ "" ], "operator":"equals" } } ] }, { "name":"freevxfs filesystem check", "tasks":[{ "type":"command", "executable":"modprobe -n -v freevxfs", "expected":[ "install /bin/true" ], "operator":"equals", "on_success":{"type":"command", "executable":"lsmod | grep freevxfs", "expected":[ "" ], "operator":"equals" } } ] }, { "name":"echo test", "tasks":[{ "type":"command", "executable":"echo hello", "expected":[ "hello" ], "operator":"equals", "on_success":{ "type":"command", "executable":"echo test2", "expected":[ "test2" ], "operator":"hrjeklw" } } ] }, { "name":"script test", "tasks":[ { "type":"script", "executable":"let result; let commandResult = auditheia.osExec('echo hello'); result=commandResult[1]; console.log('result:' + result); console.log('commandResult:'+ commandResult); let err = commandResult[0];", "expected":[ "hello" ], "operator":"equals" } ] } ] }' > audit.json 
+      - name: Flag Test verbosity
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -verbosity 0 && ./Auditheia -verbosity 1 && ./Auditheia -verbosity 2 && ./Auditheia -verbosity 3 && ./Auditheia -verbosity 4 
+      - name: Flag Test output
+        run: | 
+          cd /home/runner/work/Auditheia/Auditheia/src && mkdir OutputForTests
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -output /home/runner/work/Auditheia/Auditheia/src/OutputForTests/
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -output /home/runner/work/Auditheia/Auditheia/src/OutputForTests/TestOutputFile
+          cd /home/runner/work/Auditheia/Auditheia/src && echo "Anwendung Directory" && dir -all
+          cd /home/runner/work/Auditheia/Auditheia/src/OutputForTests && echo "OutputForTests Directory" && dir -all
+          echo "every Command Starts in thie DIR" && dir -all
+      - name: Flag Test check-only
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -check-only
+      - name: Flag Test json/yaml
+        run: |
+          cd /home/runner/work/Auditheia/Auditheia/src && mkdir Reports
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -yaml -output /home/runner/work/Auditheia/Auditheia/src/Reports/
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -json -output /home/runner/work/Auditheia/Auditheia/src/Reports/
+          cd /home/runner/work/Auditheia/Auditheia/src/Reports && mkdir OnlyJson
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -json -yaml -output /home/runner/work/Auditheia/Auditheia/src/Reports/OnlyJson
+          cd /home/runner/work/Auditheia/Auditheia/src/Reports && echo "Report Directory" && dir -all
+          cd /home/runner/work/Auditheia/Auditheia/src/Reports/OnlyJson && echo "OnlyJson Directory" && dir -all
+      - name: Flag Test conf
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -conf /home/runner/work/Auditheia/Auditheia/examples/audit_linux.json
+      - name: CheckCorrectRuntime positiv
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -conf /home/runner/work/Auditheia/Auditheia/examples/audit_linux.json
+      - name:  CheckCorrectRuntime negativ
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -conf /home/runner/work/Auditheia/Auditheia/examples/audit_windows.json
+      - name: UnitTest configParser
+        run: |
+          cd /home/runner/work/Auditheia/Auditheia/src && touch file.md
+          cd /home/runner/work/Auditheia/Auditheia/src && go test ./configParser/ -v
+      - name: UnitTest executor
+        run: cd /home/runner/work/Auditheia/Auditheia/src && go test ./executor/ -v
+      - name: UnitTest output
+        run: |
+          cd /home/runner/work/Auditheia && mkdir PackageOutputTest
+          cd /home/runner/work/Auditheia/PackageOutputTest && mkdir FilesToDir && mkdir copyTest
+          cd /home/runner/work/Auditheia/PackageOutputTest/copyTest && echo "Test File For Copy" > copyFrom.txt
+          cd /home/runner/work/Auditheia/PackageOutputTest && touch TestZipFolder.zip && mkdir TestZipFolderUnziped && mkdir readDirectoryDir && touch zipFilesTest.zip
+          cd /home/runner/work/Auditheia/PackageOutputTest/readDirectoryDir && echo "hello foo 4 readDirectoryDir" > foo.txt
+          cd /home/runner/work/Auditheia/PackageOutputTest/TestZipFolderUnziped && echo "hello foo 4 TestZipFolderUnziped" > foo.txt
+          cd /home/runner/work/Auditheia/PackageOutputTest && echo "hello foo 4 zipFilesTest" > foo.txt && echo "hello foo 4 zipFilesTest" > foo2.txt
+          cd /home/runner/work/Auditheia/Auditheia/src && go test ./output/ -v
+      - name: UnitTest osInfo
+        run:  cd /home/runner/work/Auditheia/Auditheia/src && go test ./osInfo/ -v
+
+  build_linux:
+    name: build_Linux_18.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-18.04 ]
+        go: [ '1.16.x' ]
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Setup code  
+        uses: actions/checkout@v2
+        with:
+          ref: main
+      - name: OS_Build
+        run: uname -a  
+      - name: Build Release
+        run: lsb_release -a   
+      - name: Change Constant LATEST_VERSION
+        run:  cd /home/runner/work/Auditheia/Auditheia/src/memory/constants && echo -e "package constants\nconst (\nLOCAL_1 bool = false\nLOCAL_2 bool = false\nRUNNER bool = true\nLATEST_VERSION bool = false\n)" > constantsForTesting.go
+      - name: Build Auditheia
+        run: cd /home/runner/work/Auditheia/Auditheia/src && go build
+      - name: Create audit.json
+        run: cd /home/runner/work/Auditheia/Auditheia/src &&  echo '{"customer_name":"Mr. Anderson","initial_date":"2021-05-06","last_changed":"2021-05-06","version":"0.0.1","conf_os":"linux","root_required":true,"additional_files":["/etc/shadow","/etc/passwd"],"audit_list":[{"name":"cramfs filesystem check","tasks":[{"type":"command","executable":"modprobe -n -v cramfs","expected":["install /bin/true" ],"operator":"equals","on_success":{"type":"command","executable":"lsmod | grep cramfs", "expected":[ "" ], "operator":"equals" } } ] }, { "name":"freevxfs filesystem check", "tasks":[{ "type":"command", "executable":"modprobe -n -v freevxfs", "expected":[ "install /bin/true" ], "operator":"equals", "on_success":{"type":"command", "executable":"lsmod | grep freevxfs", "expected":[ "" ], "operator":"equals" } } ] }, { "name":"echo test", "tasks":[{ "type":"command", "executable":"echo hello", "expected":[ "hello" ], "operator":"equals", "on_success":{ "type":"command", "executable":"echo test2", "expected":[ "test2" ], "operator":"hrjeklw" } } ] }, { "name":"script test", "tasks":[ { "type":"script", "executable":"let result; let commandResult = auditheia.osExec('echo hello'); result=commandResult[1]; console.log('result:' + result); console.log('commandResult:'+ commandResult); let err = commandResult[0];", "expected":[ "hello" ], "operator":"equals" } ] } ] }' > audit.json 
+      - name: Flag Test verbosity
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -verbosity 0 && ./Auditheia -verbosity 1 && ./Auditheia -verbosity 2 && ./Auditheia -verbosity 3 && ./Auditheia -verbosity 4 
+      - name: Flag Test output
+        run: | 
+          cd /home/runner/work/Auditheia/Auditheia/src && mkdir OutputForTests
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -output /home/runner/work/Auditheia/Auditheia/src/OutputForTests/
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -output /home/runner/work/Auditheia/Auditheia/src/OutputForTests/TestOutputFile
+          cd /home/runner/work/Auditheia/Auditheia/src && echo "Anwendung Directory" && dir -all
+          cd /home/runner/work/Auditheia/Auditheia/src/OutputForTests && echo "OutputForTests Directory" && dir -all
+          echo "every Command Starts in thie DIR" && dir -all
+      - name: Flag Test check-only
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -check-only
+      - name: Flag Test json/yaml
+        run: |
+          cd /home/runner/work/Auditheia/Auditheia/src && mkdir Reports
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -yaml -output /home/runner/work/Auditheia/Auditheia/src/Reports/
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -json -output /home/runner/work/Auditheia/Auditheia/src/Reports/
+          cd /home/runner/work/Auditheia/Auditheia/src/Reports && mkdir OnlyJson
+          cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -json -yaml -output /home/runner/work/Auditheia/Auditheia/src/Reports/OnlyJson
+          cd /home/runner/work/Auditheia/Auditheia/src/Reports && echo "Report Directory" && dir -all
+          cd /home/runner/work/Auditheia/Auditheia/src/Reports/OnlyJson && echo "OnlyJson Directory" && dir -all
+      - name: Flag Test conf
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -conf /home/runner/work/Auditheia/Auditheia/examples/audit_linux.json
+      - name: CheckCorrectRuntime positiv
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -conf /home/runner/work/Auditheia/Auditheia/examples/audit_linux.json
+      - name:  CheckCorrectRuntime negativ
+        run: cd /home/runner/work/Auditheia/Auditheia/src && ./Auditheia -conf /home/runner/work/Auditheia/Auditheia/examples/audit_windows.json
+      - name: UnitTest configParser
+        run: |
+          cd /home/runner/work/Auditheia/Auditheia/src && touch file.md
+          cd /home/runner/work/Auditheia/Auditheia/src && go test ./configParser/ -v
+      - name: UnitTest executor
+        run: cd /home/runner/work/Auditheia/Auditheia/src && go test ./executor/ -v
+      - name: UnitTest output
+        run: |
+          cd /home/runner/work/Auditheia && mkdir PackageOutputTest
+          cd /home/runner/work/Auditheia/PackageOutputTest && mkdir FilesToDir && mkdir copyTest
+          cd /home/runner/work/Auditheia/PackageOutputTest/copyTest && echo "Test File For Copy" > copyFrom.txt
+          cd /home/runner/work/Auditheia/PackageOutputTest && touch TestZipFolder.zip && mkdir TestZipFolderUnziped && mkdir readDirectoryDir && touch zipFilesTest.zip
+          cd /home/runner/work/Auditheia/PackageOutputTest/readDirectoryDir && echo "hello foo 4 readDirectoryDir" > foo.txt
+          cd /home/runner/work/Auditheia/PackageOutputTest/TestZipFolderUnziped && echo "hello foo 4 TestZipFolderUnziped" > foo.txt
+          cd /home/runner/work/Auditheia/PackageOutputTest && echo "hello foo 4 zipFilesTest" > foo.txt && echo "hello foo 4 zipFilesTest" > foo2.txt
+          cd /home/runner/work/Auditheia/Auditheia/src && go test ./output/ -v
+      - name: UnitTest osInfo
+        run:  cd /home/runner/work/Auditheia/Auditheia/src && go test ./osInfo/ -v
+      
+  build_windows_latest:
+    name: build_Windows_latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-latest]
+        go: [ '1.16.x' ]
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Setup code  
+        uses: actions/checkout@v2
+        with:
+          ref: main
+      - name: OS_Build
+        run: uname -a   
+      - name: Change Constant LATEST_VERSION
+        run:  cd D:\a\Auditheia\Auditheia\src\memory\constants ; echo "package constants" "const (" "LOCAL_1 bool = false" "LOCAL_2 bool = false" "RUNNER bool = true" "LATEST_VERSION bool = true" ")" > constantsForTesting.go 
+      - name: Build Auditheia
+        run: cd D:\a\Auditheia\Auditheia\src\ ; go build
+      - name: Create audit.json
+        run: cd D:\a\Auditheia\Auditheia\src\ ; cmd /c echo '{"customer_name":"Windows test","initial_date":"2021-05-06","last_changed":"2021-05-06","version":"0.0.1","conf_os":"windows","root_required":false,"additional_files":[],"audit_list":[{"name":"simple command demo","tasks":[{"type":"command","execute":"cmd /c echo test0","expected":["test0"],"operator":"equals"}]}]}' > audit.json 
+      - name: Flag Test verbosity
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -verbosity 0 ; .\Auditheia.exe -verbosity 1 ; .\Auditheia.exe -verbosity 2 ; .\Auditheia.exe -verbosity 3 ; .\Auditheia.exe -verbosity 4 
+      - name: Flag Test output
+        run: | 
+          cd D:\a\Auditheia\Auditheia\src\ ; md OutputForTests
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -output D:\a\Auditheia\Auditheia\src\OutputForTests\
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -output D:\a\Auditheia\Auditheia\src\OutputForTests\TestOutputFile
+          cd D:\a\Auditheia\Auditheia\src\ ; echo "Anwendung Directory" ; dir
+          cd D:\a\Auditheia\Auditheia\src\OutputForTests\ ; echo "Output Directory" && dir
+          echo "every Command Starts in thie DIR" ; dir
+      - name: Flag Test check-only
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -check-only
+      - name: Flag Test json/yaml
+        run: |
+          cd D:\a\Auditheia\Auditheia\src\ ; md Reports
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -yaml -output D:\a\Auditheia\Auditheia\src\Reports\
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -json -output D:\a\Auditheia\Auditheia\src\Reports\
+          cd D:\a\Auditheia\Auditheia\src\Reports\ ; md OnlyJson
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -json -yaml -output D:\a\Auditheia\Auditheia\src\Reports\OnlyJson
+          cd D:\a\Auditheia\Auditheia\src\Reports\ ; echo "Report Directory" ; dir
+          cd D:\a\Auditheia\Auditheia\src\Reports\OnlyJson\ ; echo "OnlyJson Directory" ; dir
+      - name: Flag Test conf
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -verbosity 4 -conf D:\a\Auditheia\Auditheia\examples\audit_windows.json
+      - name: CheckCorrectRuntime positiv
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -conf D:\a\Auditheia\Auditheia\examples\audit_windows.json
+      - name:  CheckCorrectRuntime negativ
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -conf D:\a\Auditheia\Auditheia\examples\audit_linux.json
+      - name: UnitTest configParser
+        run: |
+          cd D:\a\Auditheia\Auditheia\src\ ; touch file.md  
+          cd D:\a\Auditheia\Auditheia\src\ ; go test .\configParser\ -v
+      - name: UnitTest executor
+        run: cd D:\a\Auditheia\Auditheia\src\ ; go test .\executor\ -v
+      - name: UnitTest output
+        run: |
+          cd D:\a\Auditheia\ ; md PackageOutputTest
+          cd D:\a\Auditheia\PackageOutputTest ; md FilesToDir  ; md copyTest
+          cd D:\a\Auditheia\PackageOutputTest\copyTest ; echo "Test File For Copy" > copyFrom.txt
+          cd D:\a\Auditheia\PackageOutputTest ; touch TestZipFolder.zip ; md TestZipFolderUnziped ; md readDirectoryDir ; touch zipFilesTest.zip
+          cd D:\a\Auditheia\PackageOutputTest\readDirectoryDir ; echo "hello foo 4 readDirectoryDir" > foo.txt
+          cd D:\a\Auditheia\PackageOutputTest\TestZipFolderUnziped ; echo "hello foo 4 TestZipFolderUnziped" > foo.txt
+          cd D:\a\Auditheia\PackageOutputTest ; echo "hello foo 4 zipFilesTest" > foo.txt ; echo "hello foo 4 zipFilesTest" > foo2.txt
+          cd D:\a\Auditheia\Auditheia\src ; go test .\output\ -v
+      - name: UnitTest osInfo
+        run:  cd D:\a\Auditheia\Auditheia\src\ ; go test .\osInfo\ -v
+
+
+  build_windows:
+    name: build_Windows
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-2016 ]
+        go: [ '1.16.x' ]
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Setup code  
+        uses: actions/checkout@v2
+        with:
+          ref: main
+      - name: OS_Build
+        run: uname -a   
+      - name: Change Constant LATEST_VERSION
+        run:  cd D:\a\Auditheia\Auditheia\src\memory\constants ; echo "package constants" "const (" "LOCAL_1 bool = false" "LOCAL_2 bool = false" "RUNNER bool = true" "LATEST_VERSION bool = false" ")" > constantsForTesting.go 
+      - name: Build Auditheia
+        run: cd D:\a\Auditheia\Auditheia\src\ ; go build
+      - name: Create audit.json
+        run: cd D:\a\Auditheia\Auditheia\src\ ; cmd /c echo '{"customer_name":"Windows test","initial_date":"2021-05-06","last_changed":"2021-05-06","version":"0.0.1","conf_os":"windows","root_required":false,"additional_files":[],"audit_list":[{"name":"simple command demo","tasks":[{"type":"command","execute":"cmd /c echo test0","expected":["test0"],"operator":"equals"}]}]}' > audit.json 
+      - name: Flag Test verbosity
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -verbosity 0 ; .\Auditheia.exe -verbosity 1 ; .\Auditheia.exe -verbosity 2 ; .\Auditheia.exe -verbosity 3 ; .\Auditheia.exe -verbosity 4 
+      - name: Flag Test output
+        run: | 
+          cd D:\a\Auditheia\Auditheia\src\ ; md OutputForTests
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -output D:\a\Auditheia\Auditheia\src\OutputForTests\
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -output D:\a\Auditheia\Auditheia\src\OutputForTests\TestOutputFile
+          cd D:\a\Auditheia\Auditheia\src\ ; echo "Anwendung Directory" ; dir
+          cd D:\a\Auditheia\Auditheia\src\OutputForTests\ ; echo "Output Directory" && dir
+          echo "every Command Starts in thie DIR" ; dir
+      - name: Flag Test check-only
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -check-only
+      - name: Flag Test json/yaml
+        run: |
+          cd D:\a\Auditheia\Auditheia\src\ ; md Reports
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -yaml -output D:\a\Auditheia\Auditheia\src\Reports\
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -json -output D:\a\Auditheia\Auditheia\src\Reports\
+          cd D:\a\Auditheia\Auditheia\src\Reports\ ; md OnlyJson
+          cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -json -yaml -output D:\a\Auditheia\Auditheia\src\Reports\OnlyJson
+          cd D:\a\Auditheia\Auditheia\src\Reports\ ; echo "Report Directory" ; dir
+          cd D:\a\Auditheia\Auditheia\src\Reports\OnlyJson\ ; echo "OnlyJson Directory" ; dir
+      - name: Flag Test conf
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -verbosity 4 -conf D:\a\Auditheia\Auditheia\examples\audit_windows.json
+      - name: CheckCorrectRuntime positiv
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -conf D:\a\Auditheia\Auditheia\examples\audit_windows.json
+      - name:  CheckCorrectRuntime negativ
+        run: cd D:\a\Auditheia\Auditheia\src\ ; .\Auditheia.exe -conf D:\a\Auditheia\Auditheia\examples\audit_linux.json
+      - name: UnitTest configParser
+        run: |
+          cd D:\a\Auditheia\Auditheia\src\ ; touch file.md  
+          cd D:\a\Auditheia\Auditheia\src\ ; go test .\configParser\ -v
+      - name: UnitTest executor
+        run: cd D:\a\Auditheia\Auditheia\src\ ; go test .\executor\ -v
+      - name: UnitTest output
+        run: |
+          cd D:\a\Auditheia\ ; md PackageOutputTest
+          cd D:\a\Auditheia\PackageOutputTest ; md FilesToDir ; md copyTest
+          cd D:\a\Auditheia\PackageOutputTest\copyTest ; echo "Test File For Copy" > copyFrom.txt
+          cd D:\a\Auditheia\PackageOutputTest ; touch TestZipFolder.zip ; md TestZipFolderUnziped ; md readDirectoryDir ; touch zipFilesTest.zip
+          cd D:\a\Auditheia\PackageOutputTest\readDirectoryDir ; echo "hello foo 4 readDirectoryDir" > foo.txt
+          cd D:\a\Auditheia\PackageOutputTest\TestZipFolderUnziped ; echo "hello foo 4 TestZipFolderUnziped" > foo.txt
+          cd D:\a\Auditheia\PackageOutputTest ; echo "hello foo 4 zipFilesTest" > foo.txt ; echo "hello foo 4 zipFilesTest" > foo2.txt
+          cd D:\a\Auditheia\Auditheia\src ; go test .\output\ -v
+      - name: UnitTest osInfo
+        run:  cd D:\a\Auditheia\Auditheia\src\ ; go test .\osInfo\ -v
+
+
+  build_macOS:
+    name: build_macOS_X
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ macos-latest ]
+        go: [ '1.16.x' ]
+    steps:
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Setup code  
+        uses: actions/checkout@v2
+        with:
+          ref: main
+      - name: OS_Build
+        run: uname -a  
+      - name: Change Constant LATEST_VERSION
+        run:  cd /Users/runner/work/Auditheia/Auditheia/src/memory/constants  && echo -e "package constants\nconst (\nLOCAL_1 bool = false\nLOCAL_2 bool = false\nRUNNER bool = true\nLATEST_VERSION bool = true\n)" > constantsForTesting.go
+      - name: Build Auditheia
+        run: cd /Users/runner/work/Auditheia/Auditheia/src && go build
+      - name: Create audit.json
+        run: cd /Users/runner/work/Auditheia/Auditheia/src && echo '{"customer_name":"Mr. Anderson","initial_date":"2021-05-06","last_changed":"2021-05-06","version":"0.0.1","conf_os":"linux","root_required":true,"additional_files":["/etc/shadow","/etc/passwd"],"audit_list":[{"name":"cramfs filesystem check","tasks":[{"type":"command","executable":"modprobe -n -v cramfs","expected":["install /bin/true" ],"operator":"equals","on_success":{"type":"command","executable":"lsmod | grep cramfs", "expected":[ "" ], "operator":"equals" } } ] }, { "name":"freevxfs filesystem check", "tasks":[{ "type":"command", "executable":"modprobe -n -v freevxfs", "expected":[ "install /bin/true" ], "operator":"equals", "on_success":{"type":"command", "executable":"lsmod | grep freevxfs", "expected":[ "" ], "operator":"equals" } } ] }, { "name":"echo test", "tasks":[{ "type":"command", "executable":"echo hello", "expected":[ "hello" ], "operator":"equals", "on_success":{ "type":"command", "executable":"echo test2", "expected":[ "test2" ], "operator":"hrjeklw" } } ] }, { "name":"script test", "tasks":[ { "type":"script", "executable":"let result; let commandResult = auditheia.osExec('echo hello'); result=commandResult[1]; console.log('result:' + result); console.log('commandResult:'+ commandResult); let err = commandResult[0];", "expected":[ "hello" ], "operator":"equals" } ] } ] }' > audit.json 
+      - name: Flag Test verbosity
+        run: cd /Users/runner/work/Auditheia/Auditheia/src && echo Verbosity 0 && ./Auditheia -verbosity 0 && echo Verbosity 1 && ./Auditheia -verbosity 1 && echo Verbosity 2 &&  ./Auditheia -verbosity 2 && echo Verbosity 3 && ./Auditheia -verbosity 3 && echo Verbosity 4 && ./Auditheia -verbosity 4 
+      - name: Flag Test output
+        run: | 
+          cd /Users/runner/work/Auditheia/Auditheia/src && mkdir OutputForTests
+          cd /Users/runner/work/Auditheia/Auditheia/src && ./Auditheia -output /Users/runner/work/Auditheia/Auditheia/src/OutputForTests/
+          cd /Users/runner/work/Auditheia/Auditheia/src && ./Auditheia -output /Users/runner/work/Auditheia/Auditheia/src/OutputForTests/TestOutputFile
+          cd /Users/runner/work/Auditheia/Auditheia/src && echo "Anwendung Directory" && ls
+          cd /Users/runner/work/Auditheia/Auditheia/src/OutputForTests/ && echo "Output Directory" && ls
+          echo "every Command Starts in thie DIR" && ls
+      - name: Flag Test check-only
+        run: cd /Users/runner/work/Auditheia/Auditheia/src && ./Auditheia -check-only
+      - name: Flag Test json/yaml
+        run: |
+          cd /Users/runner/work/Auditheia/Auditheia/src && mkdir Reports
+          cd /Users/runner/work/Auditheia/Auditheia/src && ./Auditheia -yaml -output /Users/runner/work/Auditheia/Auditheia/src/Reports
+          cd /Users/runner/work/Auditheia/Auditheia/src && ./Auditheia -json -output /Users/runner/work/Auditheia/Auditheia/src/Reports
+          cd /Users/runner/work/Auditheia/Auditheia/src/Reports && mkdir OnlyJson
+          cd /Users/runner/work/Auditheia/Auditheia/src/ && ./Auditheia -json -yaml -output /Users/runner/work/Auditheia/Auditheia/src/Reports/OnlyJson
+          cd /Users/runner/work/Auditheia/Auditheia/src/Reports && echo "Report Directory" && ls
+          cd /Users/runner/work/Auditheia/Auditheia/src/Reports/OnlyJson/ && echo "OnlyJson Directory" && ls
+      - name: Flag Test conf
+        run: cd /Users/runner/work/Auditheia/Auditheia/src/ && ./Auditheia -verbosity 4 -conf /Users/runner/work/Auditheia/Auditheia/examples/audit_macOS.json
+      - name: CheckCorrectRuntime positiv
+        run: cd /Users/runner/work/Auditheia/Auditheia/src/ && ./Auditheia -conf /Users/runner/work/Auditheia/Auditheia/examples/audit_macOS.json
+      - name:  CheckCorrectRuntime negativ
+        run: cd /Users/runner/work/Auditheia/Auditheia/src/ && ./Auditheia -conf /Users/runner/work/Auditheia/Auditheia/examples/audit_linux.json
+      - name: UnitTest configParser
+        run: |
+          cd /Users/runner/work/Auditheia/Auditheia/src/ && touch file.md  
+          cd /Users/runner/work/Auditheia/Auditheia/src/ && go test ./configParser/ -v
+      - name: UnitTest executor
+        run: cd /Users/runner/work/Auditheia/Auditheia/src/ && go test ./executor/ -v
+      - name: UnitTest output
+        run: |
+          cd /Users/runner/work/Auditheia/ && mkdir PackageOutputTest
+          cd /Users/runner/work/Auditheia/PackageOutputTest && mkdir FilesToDir && mkdir copyTest
+          cd /Users/runner/work/Auditheia/PackageOutputTest/copyTest && echo "Test File For Copy" > copyFrom.txt
+          cd /Users/runner/work/Auditheia/PackageOutputTest && touch TestZipFolder.zip && mkdir TestZipFolderUnziped && mkdir readDirectoryDir && touch zipFilesTest.zip
+          cd /Users/runner/work/Auditheia/PackageOutputTest/readDirectoryDir && echo "hello foo 4 readDirectoryDir" > foo.txt
+          cd /Users/runner/work/Auditheia/PackageOutputTest/TestZipFolderUnziped && echo "hello foo 4 TestZipFolderUnziped" > foo.txt
+          cd /Users/runner/work/Auditheia/Auditheia/PackageOutputTest && echo "hello foo 4 zipFilesTest" > foo.txt ; echo "hello foo 4 zipFilesTest" > foo2.txt
+          cd /Users/runner/work/Auditheia/Auditheia/src && go test ./output/ -v
+      - name: UnitTest osInfo
+        run:  cd /Users/runner/work/Auditheia/Auditheia/src/ && go test ./osInfo/ -v
